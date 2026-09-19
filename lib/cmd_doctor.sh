@@ -23,6 +23,21 @@ kbm_doctor_line() {
     printf '  %s%*s %s\n' "$label" $((18 - width)) '' "$value"
 }
 
+# 调用 Windows 侧的 dotnet.exe：先在子 shell 里切到 Windows 盘（避免 UNC 工作目录），
+# 无论成功失败都返回 0，不干扰调用方的 set -e。
+kbm_win_dotnet_run() {
+    local win_dotnet="$1"
+    shift
+    (
+        cd -- "$(kbm_win_mount_root)" 2>/dev/null || exit 0
+        if have timeout; then
+            timeout 30 "$win_dotnet" "$@" 2>/dev/null
+        else
+            "$win_dotnet" "$@" 2>/dev/null
+        fi
+    ) || true
+}
+
 kbm_cmd_doctor() {
     local mount; mount="$(kbm_win_mount_root)"
 
@@ -96,8 +111,8 @@ kbm_cmd_doctor() {
     if win_dotnet="$(kbm_win_dotnet)"; then
         kbm_doctor_line "dotnet.exe" "$(kbm_to_windows_path "$win_dotnet")"
         local sdk_list runtime_list
-        sdk_list="$( cd -- "$mount" 2>/dev/null && timeout 30 "$win_dotnet" --list-sdks 2>/dev/null || true )"
-        runtime_list="$( cd -- "$mount" 2>/dev/null && timeout 30 "$win_dotnet" --list-runtimes 2>/dev/null | grep 'Microsoft.NETCore.App' || true )"
+        sdk_list="$(kbm_win_dotnet_run "$win_dotnet" --list-sdks)"
+        runtime_list="$(kbm_win_dotnet_run "$win_dotnet" --list-runtimes)"
         if [[ -n "$sdk_list" ]]; then
             while IFS= read -r line; do
                 [[ -n "$line" ]] && kbm_doctor_line "SDK" "$line"
@@ -105,10 +120,11 @@ kbm_cmd_doctor() {
         fi
         if [[ -n "$runtime_list" ]]; then
             while IFS= read -r line; do
-                [[ -n "$line" ]] && kbm_doctor_line "运行时" "$line"
+                [[ "$line" == *"Microsoft.NETCore.App"* ]] || continue
+                kbm_doctor_line "运行时" "$line"
             done <<< "$runtime_list"
         fi
-        if printf '%s' "$runtime_list" | grep -q 'Microsoft.NETCore.App 8\.'; then
+        if [[ "$runtime_list" == *"Microsoft.NETCore.App 8."* ]]; then
             kbm_doctor_line "框架依赖发布" "Windows 上已有 .NET 8 运行时，可直接运行"
         else
             kbm_doctor_line "框架依赖发布" "缺少 .NET 8 运行时，请改用 publish/deploy --self-contained"

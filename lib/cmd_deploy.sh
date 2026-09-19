@@ -65,9 +65,10 @@ kbm_deploy_one() {
     local target="$destroot/$name"
 
     # 需要在覆盖时保留的文件：先挪到临时目录，删完旧目录再放回来
+    local -a preserve=(theme.json)
     local -a keep=()
     local keep_tmp="" f
-    for f in theme.json; do
+    for f in "${preserve[@]}"; do
         [[ -f "$target/$f" ]] && keep+=("$target/$f")
     done
     if [[ ${#keep[@]} -gt 0 && "$KBM_DRY_RUN" != "1" ]]; then
@@ -78,7 +79,8 @@ kbm_deploy_one() {
     fi
 
     if [[ "$KBM_DRY_RUN" != "1" && -e "$target" ]] && ! rm -rf "$target" 2>/dev/null; then
-        local alt="$destroot/$name-$(date '+%Y%m%d-%H%M%S')"
+        local alt
+        alt="$destroot/$name-$(date '+%Y%m%d-%H%M%S')"
         warn "$target 被占用（GUI 可能还在运行），改为部署到 $(basename -- "$alt")"
         target="$alt"
     fi
@@ -107,6 +109,15 @@ kbm_deploy_one() {
 kbm_launch_gui() {
     local dir="${KBM_DEPLOY_ACTUAL[gui]:-$KBM_DEPLOY_DIR/gui}"
     local exe="$dir/KBManager.GUI.exe"
+
+    if [[ "$KBM_DRY_RUN" == "1" ]]; then
+        local dry_cmd
+        dry_cmd="$(kbm_windows_cmd 2>/dev/null || printf 'cmd.exe')"
+        printf '%s  [dry-run]%s %s /c start "" %s\n' \
+            "$KBM_C_YELLOW" "$KBM_C_RESET" "$dry_cmd" "$(kbm_to_windows_path "$exe")" >&2
+        return 0
+    fi
+
     if [[ ! -f "$exe" ]]; then
         warn "找不到 $exe，无法启动 GUI"
         return 1
@@ -121,10 +132,6 @@ kbm_launch_gui() {
 
     local win_exe; win_exe="$(kbm_to_windows_path "$exe")"
     log "在 Windows 上启动：$win_exe"
-    if [[ "$KBM_DRY_RUN" == "1" ]]; then
-        printf '%s  [dry-run]%s %s /c start "" %s\n' "$KBM_C_YELLOW" "$KBM_C_RESET" "$cmd_bin" "$win_exe" >&2
-        return 0
-    fi
 
     # 先切到 Windows 目录再调 cmd.exe，避免 UNC 工作目录告警
     ( cd -- "$(kbm_win_mount_root)" 2>/dev/null || cd / ; \

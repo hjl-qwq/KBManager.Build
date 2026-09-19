@@ -81,14 +81,15 @@ kbm_load_config() {
         fi
     done
 
-    # 可选的本地配置（不纳入版本管理），后者优先
-    KBM_CONFIG_FILE=""
+    # 可选的本地配置（不纳入版本管理），后者优先。
+    # KBM_CONFIG_FILE / KBM_DEPLOY_DIR 会被其他子命令文件读取，故 export。
+    export KBM_CONFIG_FILE=""
     local f
     for f in "$KBM_BUILD_ROOT/build.env" "$KBM_BUILD_ROOT/config/build.env"; do
         if [[ -f "$f" ]]; then
             # shellcheck disable=SC1090
             source "$f"
-            KBM_CONFIG_FILE="$f"
+            export KBM_CONFIG_FILE="$f"
             break
         fi
     done
@@ -106,7 +107,7 @@ kbm_load_config() {
     KBM_RID="${RID:-win-x64}"
     KBM_SELF_CONTAINED="${SELF_CONTAINED:-0}"
     KBM_ARTIFACTS="${ARTIFACTS:-$KBM_BUILD_ROOT/artifacts}"
-    KBM_DEPLOY_DIR="${WIN_DEPLOY_DIR:-}"
+    export KBM_DEPLOY_DIR="${WIN_DEPLOY_DIR:-}"
     KBM_NUGET_PACKAGES="${NUGET_PACKAGES:-}"
     KBM_DOTNET_BIN="${DOTNET_BIN:-}"
 
@@ -258,12 +259,14 @@ kbm_find_dotnet() {
     [[ -n "${KBM_DOTNET_BIN:-}" ]] || return 1
 
     # 用户级安装必须显式指定 DOTNET_ROOT，系统安装则不需要
+    local dotnet_dir
+    dotnet_dir="$(dirname -- "$KBM_DOTNET_BIN")"
     case "$KBM_DOTNET_BIN" in
         "$HOME/.dotnet/dotnet"|"$KBM_BUILD_ROOT/.dotnet/dotnet"|"${KBM_SOURCE_DIR:-/nonexistent}/.dotnet/dotnet")
-            export DOTNET_ROOT="$(dirname -- "$KBM_DOTNET_BIN")"
+            export DOTNET_ROOT="$dotnet_dir"
             ;;
     esac
-    export PATH="$(dirname -- "$KBM_DOTNET_BIN"):$PATH"
+    export PATH="$dotnet_dir:$PATH"
 
     "$KBM_DOTNET_BIN" --list-sdks 2>/dev/null | grep -q '^[0-9]' || return 1
     KBM_DOTNET_VERSION="$("$KBM_DOTNET_BIN" --version 2>/dev/null || printf 'unknown')"

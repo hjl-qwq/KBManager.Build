@@ -4,8 +4,16 @@
 # run-local —— 用 WSLg 在本机 Linux 侧跑 GUI，适合快速验证界面逻辑（不经过 Windows）。
 
 kbm_cmd_run() {
-    KBM_RUN_AFTER_DEPLOY=1
     kbm_cmd_deploy
+
+    local t
+    for t in ${KBM_TARGETS[@]+"${KBM_TARGETS[@]}"}; do
+        if [[ "$t" == "gui" ]]; then
+            kbm_launch_gui
+            return 0
+        fi
+    done
+    warn "本次只发布了 --cli，没有 GUI 可以启动"
 }
 
 kbm_cmd_run_local() {
