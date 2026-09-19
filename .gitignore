@@ -1,0 +1,16 @@
+# 构建产物与本地配置
+artifacts/
+*.zip
+
+# 本地配置（示例见 config/build.env.example）
+build.env
+config/build.env
+
+# setup-wsl.sh 选择仓库内安装时的 SDK
+.dotnet/
+
+# 编辑器 / 系统杂项
+.vscode/
+.idea/
+*.swp
+.DS_Store
